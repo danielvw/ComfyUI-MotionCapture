@@ -13,7 +13,6 @@ models/
 *.ckpt
 *.pth
 *.pkl
-*.npz
 
 # IDE
 .vscode/
@@ -27,3 +26,7 @@ Thumbs.db
 
 # HuggingFace cache
 _hf_cache/
+
+# Blender installation
+lib/blender/
+_temp_blender_download/

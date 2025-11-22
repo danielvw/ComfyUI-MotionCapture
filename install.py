@@ -1,13 +1,19 @@
 #!/usr/bin/env python3
 """
 Installation script for ComfyUI-MotionCapture
-Downloads required model checkpoints for GVHMR
+Downloads required model checkpoints for GVHMR and optionally installs Blender for FBX retargeting
 """
 
 import os
 import sys
 from pathlib import Path
 import argparse
+import platform
+import urllib.request
+import tarfile
+import zipfile
+import shutil
+import subprocess
 
 try:
     import gdown
@@ -223,6 +229,262 @@ def print_smpl_info():
     print("   • You can replace the auto-downloaded files with official ones.")
 
 
+# Blender Installation Functions
+
+def get_platform_info():
+    """Detect current platform and architecture."""
+    system = platform.system().lower()
+    machine = platform.machine().lower()
+
+    if system == "darwin":
+        plat = "macos"
+        arch = "arm64" if machine == "arm64" else "x64"
+    elif system == "linux":
+        plat = "linux"
+        arch = "x64"
+    elif system == "windows":
+        plat = "windows"
+        arch = "x64"
+    else:
+        plat = None
+        arch = None
+
+    return plat, arch
+
+
+def get_blender_download_url(platform_name, architecture):
+    """
+    Get Blender 4.2 LTS download URL for the platform.
+
+    Args:
+        platform_name: "linux", "macos", or "windows"
+        architecture: "x64" or "arm64"
+
+    Returns:
+        tuple: (download_url, version, filename) or (None, None, None) if not found
+    """
+    version = "4.2.3"
+    base_url = "https://download.blender.org/release/Blender4.2"
+
+    urls = {
+        ("linux", "x64"): (
+            f"{base_url}/blender-{version}-linux-x64.tar.xz",
+            version,
+            f"blender-{version}-linux-x64.tar.xz"
+        ),
+        ("macos", "x64"): (
+            f"{base_url}/blender-{version}-macos-x64.dmg",
+            version,
+            f"blender-{version}-macos-x64.dmg"
+        ),
+        ("macos", "arm64"): (
+            f"{base_url}/blender-{version}-macos-arm64.dmg",
+            version,
+            f"blender-{version}-macos-arm64.dmg"
+        ),
+        ("windows", "x64"): (
+            f"{base_url}/blender-{version}-windows-x64.zip",
+            version,
+            f"blender-{version}-windows-x64.zip"
+        ),
+    }
+
+    key = (platform_name, architecture)
+    if key in urls:
+        url, ver, filename = urls[key]
+        print(f"[MotionCapture Install] Using Blender {ver} for {platform_name}-{architecture}")
+        return url, ver, filename
+
+    return None, None, None
+
+
+def download_file(url, dest_path):
+    """Download file with progress."""
+    print(f"[MotionCapture Install] Downloading: {url}")
+    print(f"[MotionCapture Install] Destination: {dest_path}")
+
+    last_printed_percent = [-1]  # Use list to allow modification in nested function
+
+    def progress_hook(count, block_size, total_size):
+        percent = int(count * block_size * 100 / total_size)
+
+        # Only print every 10% to reduce verbosity
+        if percent >= last_printed_percent[0] + 10 or percent >= 100:
+            sys.stdout.write(f"\r[MotionCapture Install] Progress: {percent}%")
+            sys.stdout.flush()
+            last_printed_percent[0] = percent
+
+    try:
+        urllib.request.urlretrieve(url, dest_path, progress_hook)
+        sys.stdout.write("\n")
+        sys.stdout.flush()
+        print("[MotionCapture Install] Download complete!")
+        return True
+    except Exception as e:
+        print(f"\n[MotionCapture Install] Error downloading: {e}")
+        return False
+
+
+def extract_archive(archive_path, extract_to):
+    """Extract tar.gz, tar.xz, zip, or handle DMG (macOS)."""
+    print(f"[MotionCapture Install] Extracting: {archive_path}")
+
+    try:
+        if archive_path.endswith(('.tar.gz', '.tar.xz', '.tar.bz2')):
+            with tarfile.open(archive_path, 'r:*') as tar:
+                tar.extractall(extract_to)
+        elif archive_path.endswith('.zip'):
+            with zipfile.ZipFile(archive_path, 'r') as zip_ref:
+                zip_ref.extractall(extract_to)
+        elif archive_path.endswith('.dmg'):
+            print("[MotionCapture Install] DMG detected - mounting disk image...")
+
+            mount_result = subprocess.run(
+                ['hdiutil', 'attach', '-nobrowse', archive_path],
+                capture_output=True,
+                text=True
+            )
+
+            if mount_result.returncode != 0:
+                print(f"[MotionCapture Install] Error mounting DMG: {mount_result.stderr}")
+                return False
+
+            mount_point = None
+            for line in mount_result.stdout.split('\n'):
+                if '/Volumes/' in line:
+                    mount_point = line.split('\t')[-1].strip()
+                    break
+
+            if not mount_point:
+                print("[MotionCapture Install] Error: Could not find mount point")
+                return False
+
+            try:
+                blender_app = Path(mount_point) / "Blender.app"
+                if blender_app.exists():
+                    dest_app = Path(extract_to) / "Blender.app"
+                    shutil.copytree(blender_app, dest_app)
+                    print(f"[MotionCapture Install] Copied Blender.app to: {dest_app}")
+                else:
+                    print(f"[MotionCapture Install] Error: Blender.app not found in {mount_point}")
+                    return False
+
+            finally:
+                subprocess.run(['hdiutil', 'detach', mount_point], check=False)
+
+        else:
+            print(f"[MotionCapture Install] Error: Unknown archive format: {archive_path}")
+            return False
+
+        print(f"[MotionCapture Install] Extraction complete!")
+        return True
+
+    except Exception as e:
+        print(f"[MotionCapture Install] Error extracting: {e}")
+        return False
+
+
+def find_blender_executable(blender_dir):
+    """Find the blender executable in the extracted directory."""
+    plat, _ = get_platform_info()
+
+    if plat == "windows":
+        exe_pattern = "**/blender.exe"
+    elif plat == "macos":
+        exe_pattern = "**/MacOS/blender"
+    else:  # linux
+        exe_pattern = "**/blender"
+
+    executables = list(Path(blender_dir).glob(exe_pattern))
+
+    if executables:
+        return executables[0]
+    return None
+
+
+def install_blender(target_dir=None):
+    """
+    Install Blender for FBX retargeting.
+
+    Args:
+        target_dir: Optional target directory. If None, uses lib/blender under script directory.
+
+    Returns:
+        str: Path to Blender executable, or None if installation failed.
+    """
+    print("\n" + "="*60)
+    print("ComfyUI-MotionCapture: Blender Installation")
+    print("="*60 + "\n")
+
+    if target_dir is None:
+        script_dir = Path(__file__).parent.absolute()
+        target_dir = script_dir / "lib" / "blender"
+    else:
+        target_dir = Path(target_dir)
+
+    # Check if Blender already installed
+    blender_exe = find_blender_executable(target_dir)
+    if blender_exe and blender_exe.exists():
+        print("[MotionCapture Install] Blender already installed at:")
+        print(f"[MotionCapture Install]   {blender_exe}")
+        print("[MotionCapture Install] Skipping download.")
+        return str(blender_exe)
+
+    # Detect platform
+    plat, arch = get_platform_info()
+    if not plat or not arch:
+        print("[MotionCapture Install] Error: Could not detect platform")
+        print("[MotionCapture Install] Please install Blender manually from: https://www.blender.org/download/")
+        return None
+
+    print(f"[MotionCapture Install] Detected platform: {plat}-{arch}")
+
+    # Get download URL
+    url, version, filename = get_blender_download_url(plat, arch)
+    if not url:
+        print("[MotionCapture Install] Error: Could not find Blender download for your platform")
+        print("[MotionCapture Install] Please install Blender manually from: https://www.blender.org/download/")
+        return None
+
+    # Create temporary download directory
+    temp_dir = target_dir.parent / "_temp_blender_download"
+    temp_dir.mkdir(parents=True, exist_ok=True)
+
+    try:
+        # Download
+        download_path = temp_dir / filename
+        if not download_file(url, str(download_path)):
+            return None
+
+        # Extract
+        target_dir.mkdir(parents=True, exist_ok=True)
+        if not extract_archive(str(download_path), str(target_dir)):
+            return None
+
+        print("\n[MotionCapture Install] Blender installation complete!")
+        print(f"[MotionCapture Install] Location: {target_dir}")
+
+        # Find blender executable
+        blender_exe = find_blender_executable(target_dir)
+
+        if blender_exe:
+            print(f"[MotionCapture Install] Blender executable: {blender_exe}")
+            return str(blender_exe)
+        else:
+            print("[MotionCapture Install] Warning: Could not find blender executable")
+            return None
+
+    except Exception as e:
+        print(f"\n[MotionCapture Install] Error during installation: {e}")
+        return None
+
+    finally:
+        # Cleanup temp files
+        if temp_dir.exists():
+            print("[MotionCapture Install] Cleaning up temporary files...")
+            shutil.rmtree(temp_dir, ignore_errors=True)
+
+
 def main():
     """Main installation function."""
     parser = argparse.ArgumentParser(
@@ -237,6 +499,11 @@ def main():
         "--model",
         choices=list(MODELS.keys()),
         help="Download specific model only"
+    )
+    parser.add_argument(
+        "--install-blender",
+        action="store_true",
+        help="Install Blender for FBX retargeting support"
     )
     args = parser.parse_args()
 
@@ -256,10 +523,24 @@ def main():
     # Print SMPL info
     print_smpl_info()
 
+    # Install Blender if requested
+    if args.install_blender:
+        blender_path = install_blender()
+        if blender_path:
+            print(f"\n✅ Blender installed successfully at: {blender_path}")
+        else:
+            print("\n⚠ Blender installation failed. You can:")
+            print("  • Install manually from https://www.blender.org/download/")
+            print("  • Or run: python install.py --install-blender")
+
     # Final message
     print_header("Installation Complete!")
     print("✅ All models downloaded successfully!")
     print("🚀 You can now use ComfyUI-MotionCapture nodes in ComfyUI.")
+    if args.install_blender:
+        print("🎨 Blender installed for FBX retargeting support.")
+    else:
+        print("💡 To enable FBX retargeting, run: python install.py --install-blender")
     print("💡 Restart ComfyUI to load the new nodes.\n")
 
     return 0 if success else 1
