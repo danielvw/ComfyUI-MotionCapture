@@ -19,13 +19,14 @@ class LoadFBXCharacter:
     def INPUT_TYPES(cls):
         return {
             "required": {
+                "source_folder": (["input", "output"], {"default": "input"}),
                 "fbx_file": ("COMBO", {
                     "remote": {
                         "route": "/motioncapture/fbx_files",
+                        "query": "source_folder", # Pass selected source_folder to API
                         "refresh_button": True,
                     },
                 }),
-                "source_folder": (["output", "input"],),
             }
         }
 

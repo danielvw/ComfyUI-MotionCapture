@@ -190,9 +190,12 @@ class SMPLtoBVH_TPose:
                     "step": 0.01,
                     "round": 0.01,
                 }),
-                "arm_x_fix": ("FLOAT", {"default": 1.0, "min": -1.0, "max": 1.0, "step": 2.0}),
-                "arm_y_fix": ("FLOAT", {"default": 1.0, "min": -1.0, "max": 1.0, "step": 2.0}),
-                "arm_z_fix": ("FLOAT", {"default": 1.0, "min": -1.0, "max": 1.0, "step": 2.0}),
+                "shoulder_x_fix": ("FLOAT", {"default": 1.0, "min": -1.0, "max": 1.0, "step": 2.0}),
+                "shoulder_y_fix": ("FLOAT", {"default": 1.0, "min": -1.0, "max": 1.0, "step": 2.0}),
+                "shoulder_z_fix": ("FLOAT", {"default": 1.0, "min": -1.0, "max": 1.0, "step": 2.0}),
+                "elbow_x_fix": ("FLOAT", {"default": 1.0, "min": -1.0, "max": 1.0, "step": 2.0}),
+                "elbow_y_fix": ("FLOAT", {"default": 1.0, "min": -1.0, "max": 1.0, "step": 2.0}),
+                "elbow_z_fix": ("FLOAT", {"default": 1.0, "min": -1.0, "max": 1.0, "step": 2.0}),
             },
         }
 
@@ -208,9 +211,12 @@ class SMPLtoBVH_TPose:
         output_path: str,
         fps: int = 30,
         scale: float = 1.0,
-        arm_x_fix: float = 1.0,
-        arm_y_fix: float = 1.0,
-        arm_z_fix: float = 1.0,
+        shoulder_x_fix: float = 1.0,
+        shoulder_y_fix: float = 1.0,
+        shoulder_z_fix: float = 1.0,
+        elbow_x_fix: float = 1.0,
+        elbow_y_fix: float = 1.0,
+        elbow_z_fix: float = 1.0,
     ) -> Tuple[Dict, str, str]:
         """
         Convert SMPL parameters to BVH file format with T-pose offsets.
@@ -286,8 +292,12 @@ class SMPLtoBVH_TPose:
             frame_time = 1.0 / fps
 
             # Convert axis-angle rotations to Euler angles (ZXY order, BVH standard)
-            # Pass correction factors
-            euler_rotations = self._axis_angle_to_euler(full_pose, arm_x_fix, arm_y_fix, arm_z_fix)
+            # Pass separate correction factors for shoulders and elbows
+            euler_rotations = self._axis_angle_to_euler(
+                full_pose, 
+                shoulder_x_fix, shoulder_y_fix, shoulder_z_fix,
+                elbow_x_fix, elbow_y_fix, elbow_z_fix
+            )
 
             # Validate rotation ranges to detect potential issues
             rot_mins = np.min(euler_rotations, axis=(0, 1))
@@ -346,16 +356,15 @@ class SMPLtoBVH_TPose:
             traceback.print_exc()
             return ({}, "", error_msg)
 
-    def _axis_angle_to_euler(self, axis_angle: np.ndarray, x_fix: float, y_fix: float, z_fix: float) -> np.ndarray:
+    def _axis_angle_to_euler(
+        self, 
+        axis_angle: np.ndarray, 
+        s_x: float, s_y: float, s_z: float,
+        e_x: float, e_y: float, e_z: float
+    ) -> np.ndarray:
         """
         Convert axis-angle rotations to Euler angles (ZXY order for BVH).
-
-        Args:
-            axis_angle: [F, J, 3] axis-angle rotations
-            x_fix, y_fix, z_fix: Multipliers for arm rotation axes
-
-        Returns:
-            [F, J, 3] Euler angles in degrees (ZXY order)
+        Applies separate fixes for Shoulders and Elbows/Wrists.
         """
         num_frames, num_joints, _ = axis_angle.shape
         euler = np.zeros((num_frames, num_joints, 3))
@@ -373,18 +382,21 @@ class SMPLtoBVH_TPose:
 
                 # Convert to Euler angles (ZXY order, intrinsic)
                 # BVH uses ZXY intrinsic Euler angles in degrees
-                # IMPORTANT: Use uppercase 'ZXY' for intrinsic rotations (not lowercase 'zxy' for extrinsic)
                 euler_angles = rot.as_euler('ZXY', degrees=True)
                 
-                # Apply fixes to arm joints (Shoulders, Elbows, Wrists, Hands)
-                # Joints 16-23 are the arm chain (L_Shoulder to R_Hand)
-                if 16 <= joint <= 23:
-                    # euler_angles is [Z, X, Y] due to 'ZXY' order?
-                    # NO: scipy returns [alpha, beta, gamma] corresponding to axes 'Z', 'X', 'Y'.
-                    # So index 0 is Z, 1 is X, 2 is Y.
-                    euler_angles[0] *= z_fix # Z
-                    euler_angles[1] *= x_fix # X
-                    euler_angles[2] *= y_fix # Y
+                # Apply fixes
+                
+                # Shoulders (16, 17)
+                if joint == 16 or joint == 17:
+                    euler_angles[0] *= s_z # Z
+                    euler_angles[1] *= s_x # X
+                    euler_angles[2] *= s_y # Y
+                
+                # Elbows/Wrists/Hands (18-23)
+                elif 18 <= joint <= 23:
+                    euler_angles[0] *= e_z # Z
+                    euler_angles[1] *= e_x # X
+                    euler_angles[2] *= e_y # Y
 
                 euler[frame, joint] = euler_angles
 

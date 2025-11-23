@@ -69,6 +69,7 @@ const BVH_VIEWER_HTML = `
         let totalFrames = 0;
         let frameTime = 0;
         let skeleton = null;
+        let gridHelper, axesHelper;
 
         function init() {
             // Scene
@@ -79,8 +80,8 @@ const BVH_VIEWER_HTML = `
             camera = new THREE.PerspectiveCamera(
                 50,
                 window.innerWidth / window.innerHeight,
-                0.01,
-                1000
+                0.1,
+                10000
             );
             camera.position.set(2, 2, 3);
 
@@ -106,11 +107,11 @@ const BVH_VIEWER_HTML = `
             scene.add(directionalLight);
 
             // Grid
-            const gridHelper = new THREE.GridHelper(10, 10, 0x444444, 0x222222);
+            gridHelper = new THREE.GridHelper(10, 10, 0x444444, 0x222222);
             scene.add(gridHelper);
 
             // Axes helper
-            const axesHelper = new THREE.AxesHelper(1);
+            axesHelper = new THREE.AxesHelper(1);
             scene.add(axesHelper);
 
             // Handle window resize
@@ -161,19 +162,42 @@ const BVH_VIEWER_HTML = `
         }
 
         function loadBVHFromString(bvhContent, bvhInfo) {
-            console.log('[BVHViewer] Loading BVH data');
+            console.log('[BVHViewer] Loading BVH data...');
 
-            // Clear existing animation
-            if (skeletonHelper) {
-                scene.remove(skeletonHelper);
-                skeletonHelper = null;
+            // 1. Stop Animation
+            if (mixer) {
+                mixer.stopAllAction();
+                mixer.uncacheRoot(mixer.getRoot());
+                mixer = null;
             }
-            if (skeleton && skeleton.bones[0]) {
-                scene.remove(skeleton.bones[0]);
-                skeleton = null;
-            }
+            
+            // 2. Wipe Scene cleanly
+            // Remove everything except lights and grid/axes
+            // We assume lights/grid are added first. But simpler is to remove specific types or recreate scene.
+            // Let's remove identifiable objects.
+            
+            const toRemove = [];
+            scene.traverse((child) => {
+                if (child.isSkeletonHelper || (child.isMesh && child !== gridHelper && child !== axesHelper) || child.type === 'Bone') {
+                    toRemove.push(child);
+                }
+            });
+            
+            toRemove.forEach(child => {
+                scene.remove(child);
+                if (child.geometry) child.geometry.dispose();
+                if (child.material) {
+                    if (Array.isArray(child.material)) child.material.forEach(m => m.dispose());
+                    else child.material.dispose();
+                }
+            });
+            
+            skeletonHelper = null;
+            skeleton = null;
+            
+            console.log('[BVHViewer] Scene cleared.');
 
-            // Parse BVH
+            // 3. Parse BVH
             const loader = new BVHLoader();
             let result;
 
@@ -188,77 +212,83 @@ const BVH_VIEWER_HTML = `
             skeleton = result.skeleton;
             clip = result.clip;
 
-            // Add skeleton to scene
+            // 4. Add new skeleton
             scene.add(skeleton.bones[0]);
 
-            // Create skeleton helper for visualization
+            // Helper
             skeletonHelper = new THREE.SkeletonHelper(skeleton.bones[0]);
             skeletonHelper.skeleton = skeleton;
-
-            // Make skeleton lines bright and visible
-            skeletonHelper.material = new THREE.LineBasicMaterial({
-                color: 0x00ff00,  // Bright green
-                linewidth: 3,      // Will be ignored by WebGL but doesn't hurt
-                depthTest: false   // Always visible, even behind grid
-            });
+            skeletonHelper.material = new THREE.LineBasicMaterial({ color: 0x00ff00, linewidth: 3, depthTest: false });
             scene.add(skeletonHelper);
 
-            // Add sphere markers at each joint for better visibility
+            // Joint Markers
             const jointGeometry = new THREE.SphereGeometry(0.02, 8, 8);
-            const jointMaterial = new THREE.MeshBasicMaterial({
-                color: 0xff0000,  // Red joints
-                depthTest: false
+            const jointMaterial = new THREE.MeshBasicMaterial({ color: 0xff0000, depthTest: false });
+            
+            // Traverse properly to add markers
+            skeleton.bones[0].traverse((bone) => {
+                if (bone.isBone) {
+                    const jointMarker = new THREE.Mesh(jointGeometry, jointMaterial);
+                    bone.add(jointMarker);
+                }
             });
 
-            skeleton.bones.forEach(bone => {
-                const jointMarker = new THREE.Mesh(jointGeometry, jointMaterial);
-                bone.add(jointMarker);
-            });
-
-            // Setup animation
+            // 5. Setup Animation
             mixer = new THREE.AnimationMixer(skeleton.bones[0]);
             currentAction = mixer.clipAction(clip);
             currentAction.setEffectiveWeight(1.0);
-
-            // Get animation info
-            totalFrames = Math.floor(clip.duration / (1/30)); // Approximate frame count
+            
+            // Reset State
+            isPlaying = true;
+            currentFrame = 0;
+            
+            // Info
+            totalFrames = Math.floor(clip.duration / (1/30)); 
+            if (bvhInfo && bvhInfo.num_frames) totalFrames = bvhInfo.num_frames;
             frameTime = clip.duration / totalFrames;
 
-            console.log('[BVHViewer] BVH loaded:', {
-                bones: skeleton.bones.length,
-                duration: clip.duration,
-                frames: totalFrames
-            });
+            console.log('[BVHViewer] BVH loaded:', { bones: skeleton.bones.length, duration: clip.duration, frames: totalFrames });
 
-            // Center camera on skeleton
-            const box = new THREE.Box3().setFromObject(skeleton.bones[0]);
-            const center = box.getCenter(new THREE.Vector3());
-            const size = box.getSize(new THREE.Vector3());
-            const maxDim = Math.max(size.x, size.y, size.z);
-            const fov = camera.fov * (Math.PI / 180);
-            let cameraZ = Math.abs(maxDim / 2 / Math.tan(fov / 2));
-            cameraZ *= 1.5; // Zoom out a bit
+            // 6. Camera Framing
+            try {
+                const box = new THREE.Box3().setFromObject(skeleton.bones[0]);
+                const center = box.getCenter(new THREE.Vector3());
+                const size = box.getSize(new THREE.Vector3());
+                
+                // Fallback if box is empty (single point)
+                if (size.lengthSq() < 0.001) {
+                    center.set(0, 1, 0);
+                    size.set(1, 2, 1);
+                }
 
-            camera.position.set(center.x + cameraZ, center.y + cameraZ * 0.5, center.z + cameraZ);
-            camera.lookAt(center);
-            controls.target.copy(center);
-            controls.update();
+                const maxDim = Math.max(size.x, size.y, size.z);
+                const fov = camera.fov * (Math.PI / 180);
+                let cameraZ = Math.abs(maxDim / 2 / Math.tan(fov / 2));
+                cameraZ *= 1.5;
 
-            // Update info display
+                camera.position.set(center.x, center.y + size.y/2, center.z + cameraZ);
+                camera.lookAt(center);
+                controls.target.copy(center);
+                controls.update();
+            } catch (e) {
+                console.warn("[BVHViewer] Camera framing failed:", e);
+            }
+
+            // Update UI
             const infoDiv = document.getElementById('info');
             infoDiv.innerHTML = \`
                 <strong>BVH Animation</strong><br>
                 Bones: \${skeleton.bones.length}<br>
-                Frames: \${bvhInfo.num_frames || totalFrames}<br>
+                Frames: \${totalFrames}<br>
                 FPS: \${bvhInfo.fps || 30}<br>
                 Duration: \${clip.duration.toFixed(2)}s
             \`;
             infoDiv.style.display = 'block';
-
             document.getElementById('loading').style.display = 'none';
 
-            // Auto-play
             playAnimation();
+            
+            window.parent.postMessage({ type: 'frameChanged', frame: 0, totalFrames: totalFrames }, '*');
         }
 
         function playAnimation() {
@@ -361,12 +391,12 @@ app.registerExtension({
 
                 // Controls bar
                 const controlsBar = document.createElement("div");
-                controlsBar.style.cssText = "display: flex; gap: 10px; padding: 10px; background: #252525; align-items: center;";
+                controlsBar.style.cssText = "display: flex; flex-wrap: wrap; gap: 10px; padding: 10px; background: #252525; align-items: center; border-top: 1px solid #333;";
 
                 // Play/Pause button
                 const playButton = document.createElement("button");
                 playButton.textContent = "▶";
-                playButton.style.cssText = "width: 40px; height: 40px; border: none; border-radius: 6px; background: #4a9eff; color: white; font-size: 16px; cursor: pointer;";
+                playButton.style.cssText = "width: 30px; height: 30px; border: none; border-radius: 4px; background: #4a9eff; color: white; font-size: 14px; cursor: pointer; flex-shrink: 0;";
                 playButton.disabled = true;
                 controlsBar.appendChild(playButton);
 
@@ -377,20 +407,28 @@ app.registerExtension({
                 frameSlider.max = 100;
                 frameSlider.value = 0;
                 frameSlider.disabled = true;
-                frameSlider.style.cssText = "flex-grow: 1; height: 6px;";
+                frameSlider.style.cssText = "flex-grow: 1; height: 6px; min-width: 100px;";
                 controlsBar.appendChild(frameSlider);
 
                 // Frame counter
                 const frameCounter = document.createElement("div");
-                frameCounter.style.cssText = "padding: 5px 10px; background: rgba(0,0,0,0.7); color: #fff; border-radius: 3px; font-size: 12px; font-family: monospace; min-width: 100px; text-align: center;";
+                frameCounter.style.cssText = "padding: 4px 8px; background: rgba(0,0,0,0.3); color: #aaa; border-radius: 3px; font-size: 11px; font-family: monospace; min-width: 80px; text-align: center;";
                 frameCounter.textContent = "0 / 0";
                 controlsBar.appendChild(frameCounter);
 
-                // Speed control
+                // Separator
+                const sep = document.createElement("div");
+                sep.style.cssText = "width: 1px; height: 20px; background: #444; margin: 0 5px;";
+                controlsBar.appendChild(sep);
+
+                // Speed control container
+                const speedContainer = document.createElement("div");
+                speedContainer.style.cssText = "display: flex; align-items: center; gap: 5px;";
+                
                 const speedLabel = document.createElement("span");
-                speedLabel.textContent = "Speed:";
-                speedLabel.style.cssText = "color: #fff; font-size: 12px; margin-left: 10px;";
-                controlsBar.appendChild(speedLabel);
+                speedLabel.textContent = "Spd:";
+                speedLabel.style.cssText = "color: #aaa; font-size: 11px;";
+                speedContainer.appendChild(speedLabel);
 
                 const speedSlider = document.createElement("input");
                 speedSlider.type = "range";
@@ -398,14 +436,15 @@ app.registerExtension({
                 speedSlider.max = 2.0;
                 speedSlider.step = 0.1;
                 speedSlider.value = 1.0;
-                speedSlider.style.cssText = "width: 100px;";
-                controlsBar.appendChild(speedSlider);
+                speedSlider.style.cssText = "width: 60px; height: 4px;";
+                speedContainer.appendChild(speedSlider);
 
                 const speedValue = document.createElement("span");
                 speedValue.textContent = "1.0x";
-                speedValue.style.cssText = "color: #fff; font-size: 12px; min-width: 40px;";
-                controlsBar.appendChild(speedValue);
-
+                speedValue.style.cssText = "color: #fff; font-size: 11px; min-width: 30px;";
+                speedContainer.appendChild(speedValue);
+                
+                controlsBar.appendChild(speedContainer);
                 container.appendChild(controlsBar);
 
                 // State

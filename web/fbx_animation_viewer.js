@@ -1,6 +1,6 @@
 /**
  * FBX Animation Viewer - Interactive animation playback with Three.js AnimationMixer
- * Controls are in a separate widget below the viewer
+ * Controls are in a unified widget
  */
 
 import { app } from "../../scripts/app.js";
@@ -8,7 +8,6 @@ import { app } from "../../scripts/app.js";
 console.log("[FBXAnimationViewer] Loading FBX Animation Viewer extension");
 
 // Inline HTML viewer - NO CONTROLS, just the 3D view
-// Using string concatenation to avoid nested backtick issues
 const ANIMATION_VIEWER_HTML = `
 <!DOCTYPE html>
 <html>
@@ -134,11 +133,9 @@ const ANIMATION_VIEWER_HTML = `
                             child.castShadow = true;
                             child.receiveShadow = true;
                             child.visible = showMesh;
-                            // Replaced template literal with concatenation
                             console.log('[FBXAnimationViewer] Mesh found: ' + child.name + ', vertices: ' + child.geometry.attributes.position.count + ', visible: ' + child.visible);
                         }
                     });
-                    // Replaced template literal with concatenation
                     console.log('[FBXAnimationViewer] Total meshes loaded: ' + meshCount);
 
                     // Create skeleton helper
@@ -432,103 +429,79 @@ app.registerExtension({
             nodeType.prototype.onNodeCreated = function() {
                 const result = onNodeCreated?.apply(this, arguments);
 
-                console.log("[FBXAnimationViewer] Node created, adding animation viewer widget");
+                console.log("[FBXAnimationViewer] Node created, adding unified widget");
 
-                // Create viewer container (iframe only, no controls)
-                const viewerContainer = document.createElement("div");
-                viewerContainer.style.cssText = "position: relative; width: 100%; height: 400px; display: flex; flex-direction: column; border: 2px solid #444; border-radius: 8px 8px 0 0; overflow: hidden; background: #1a1a1a; box-sizing: border-box;";
+                // 1. Main Container (Holds Viewer + Controls)
+                const mainContainer = document.createElement("div");
+                mainContainer.style.cssText = "width: 100%; height: 100%; display: flex; flex-direction: column; overflow: hidden; background: #1a1a1a; border: 1px solid #444; box-sizing: border-box;";
 
-                // Create iframe
+                // 2. Viewer Area (Iframe) - Flex Grow to fill space
+                const viewerArea = document.createElement("div");
+                viewerArea.style.cssText = "position: relative; flex-grow: 1; min-height: 200px; overflow: hidden;";
+                
                 const iframe = document.createElement("iframe");
-                iframe.style.cssText = "display: block; max-width: 100%; max-height: 100%; width: 100%; height: 100%; border: none; flex: 1 1 0; object-fit: contain;";
-
-                // Create blob URL for viewer
+                iframe.style.cssText = "display: block; width: 100%; height: 100%; border: none;";
+                
                 const blob = new Blob([ANIMATION_VIEWER_HTML], { type: 'text/html' });
                 const blobUrl = URL.createObjectURL(blob);
                 iframe.src = blobUrl;
+                
+                viewerArea.appendChild(iframe);
+                mainContainer.appendChild(viewerArea);
 
-                viewerContainer.appendChild(iframe);
-
-                // Add viewer widget
-                const viewerWidget = this.addDOMWidget("fbx_animation_viewer", "viewer", viewerContainer, {
-                    serialize: false,
-                    hideOnZoom: false
-                });
-
-                // Make viewer widget dynamically sized
-                viewerWidget.computeSize = (width) => {
-                    const nodeHeight = this.size ? this.size[1] : 600;
-                    const widgetHeight = Math.max(300, nodeHeight - 280); // Leave room for controls (200px) + overhead (80px)
-                    return [width, widgetHeight];
-                };
-
-                // Create controls container (separate widget below viewer)
+                // 3. Controls Area - Fixed/Shrinkable
                 const controlsContainer = document.createElement("div");
-                controlsContainer.style.cssText = "width: 100%; background: #2a2a2a; border: 2px solid #444; border-top: none; border-radius: 0 0 8px 8px; padding: 12px; box-sizing: border-box; color: white; font-size: 12px; font-family: Arial, sans-serif;";
+                controlsContainer.style.cssText = "flex-shrink: 0; background: #2a2a2a; border-top: 1px solid #444; padding: 10px; box-sizing: border-box; color: white; font-size: 12px; font-family: Arial, sans-serif;";
 
                 controlsContainer.innerHTML = `
                     <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-bottom: 10px;">
-                        <button id="playPauseBtn" style="padding: 8px; background: #444; color: white; border: none; border-radius: 4px; cursor: pointer; font-size: 12px;" disabled>▶ Play</button>
-                        <button id="resetBtn" style="padding: 8px; background: #444; color: white; border: none; border-radius: 4px; cursor: pointer; font-size: 12px;" disabled>⟲ Reset</button>
+                        <button id="playPauseBtn" style="padding: 6px; background: #444; color: white; border: none; border-radius: 4px; cursor: pointer;">▶ Play</button>
+                        <button id="resetBtn" style="padding: 6px; background: #444; color: white; border: none; border-radius: 4px; cursor: pointer;">⟲ Reset</button>
                     </div>
 
-                    <div style="margin-bottom: 10px;">
-                        <label style="display: block; margin-bottom: 4px;">Timeline</label>
-                        <input type="range" id="timeline" min="0" max="100" value="0" style="width: 100%;" disabled>
-                        <div style="display: flex; justify-content: space-between; font-size: 11px; color: #aaa; margin-top: 2px;">
+                    <div style="margin-bottom: 8px;">
+                        <input type="range" id="timeline" min="0" max="100" value="0" style="width: 100%; display: block; margin-bottom: 2px;" disabled>
+                        <div style="display: flex; justify-content: space-between; font-size: 10px; color: #aaa;">
+                            <span><span id="currentFrame">0</span> / <span id="totalFrames">0</span></span>
                             <span id="currentTime">0.00s</span>
-                            <span id="duration">/ 0.00s</span>
-                        </div>
-                        <div style="display: flex; justify-content: space-between; font-size: 11px; color: #aaa;">
-                            <span>Frame: <span id="currentFrame">0</span></span>
-                            <span>/ <span id="totalFrames">0</span></span>
                         </div>
                     </div>
 
-                    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-bottom: 10px;">
-                        <div>
-                            <label style="display: block; margin-bottom: 4px;">Speed</label>
-                            <select id="speedControl" style="width: 100%; padding: 5px; background: #333; color: white; border: 1px solid #555; border-radius: 4px;" disabled>
-                                <option value="0.25">0.25x</option>
-                                <option value="0.5">0.5x</option>
-                                <option value="1" selected>1x</option>
-                                <option value="1.5">1.5x</option>
-                                <option value="2">2x</option>
-                            </select>
-                        </div>
-                        <div>
-                            <label style="display: block; margin-bottom: 4px;">Animation</label>
-                            <select id="animationSelect" style="width: 100%; padding: 5px; background: #333; color: white; border: 1px solid #555; border-radius: 4px;" disabled></select>
-                        </div>
+                    <div style="display: flex; gap: 8px; margin-bottom: 8px;">
+                        <select id="animationSelect" style="flex-grow: 1; padding: 4px; background: #333; color: white; border: 1px solid #555; border-radius: 4px;" disabled></select>
+                        <select id="speedControl" style="width: 60px; padding: 4px; background: #333; color: white; border: 1px solid #555; border-radius: 4px;" disabled>
+                            <option value="0.25">0.25x</option>
+                            <option value="0.5">0.5x</option>
+                            <option value="1" selected>1x</option>
+                            <option value="2">2x</option>
+                        </select>
                     </div>
 
-                    <div style="display: grid; grid-template-columns: repeat(2, 1fr); gap: 4px; margin-bottom: 8px;">
-                        <label style="display: flex; align-items: center; gap: 4px; cursor: pointer;">
-                            <input type="checkbox" id="loop" checked disabled> Loop
-                        </label>
-                        <label style="display: flex; align-items: center; gap: 4px; cursor: pointer;">
-                            <input type="checkbox" id="showSkeleton" checked> Skeleton
-                        </label>
-                        <label style="display: flex; align-items: center; gap: 4px; cursor: pointer;">
-                            <input type="checkbox" id="showMesh" checked> Mesh
-                        </label>
-                        <label style="display: flex; align-items: center; gap: 4px; cursor: pointer;">
-                            <input type="checkbox" id="xraySkeleton"> X-Ray
-                        </label>
+                    <div style="display: flex; flex-wrap: wrap; gap: 8px; font-size: 11px;">
+                        <label><input type="checkbox" id="loop" checked disabled> Loop</label>
+                        <label><input type="checkbox" id="showSkeleton" checked> Bones</label>
+                        <label><input type="checkbox" id="showMesh" checked> Mesh</label>
+                        <label><input type="checkbox" id="xraySkeleton"> X-Ray</label>
                     </div>
 
                     <button id="resetCamera" style="width: 100%; padding: 8px; background: #444; color: white; border: none; border-radius: 4px; cursor: pointer; font-size: 12px;">Reset Camera</button>
                 `;
+                
+                mainContainer.appendChild(controlsContainer);
 
-                // Add controls widget
-                const controlsWidget = this.addDOMWidget("fbx_controls", "controls", controlsContainer, {
+                // 4. Add Single Widget
+                const widget = this.addDOMWidget("fbx_viewer_unified", "main", mainContainer, {
                     serialize: false,
                     hideOnZoom: false
                 });
 
-                // Fixed height for controls
-                controlsWidget.computeSize = () => [0, 200];
-
+                // 5. Compute Size
+                widget.computeSize = (width) => {
+                    // Return a fixed height that includes viewer + controls. 
+                    // The flex layout will distribute it.
+                    return [width, 500];
+                };
+                
                 // Get control elements
                 const playPauseBtn = controlsContainer.querySelector('#playPauseBtn');
                 const resetBtn = controlsContainer.querySelector('#resetBtn');
@@ -541,7 +514,6 @@ app.registerExtension({
                 const xraySkeleton = controlsContainer.querySelector('#xraySkeleton');
                 const resetCamera = controlsContainer.querySelector('#resetCamera');
                 const currentTimeEl = controlsContainer.querySelector('#currentTime');
-                const durationEl = controlsContainer.querySelector('#duration');
                 const currentFrameEl = controlsContainer.querySelector('#currentFrame');
                 const totalFramesEl = controlsContainer.querySelector('#totalFrames');
 
@@ -551,7 +523,7 @@ app.registerExtension({
                 this.animationControls = {
                     playPauseBtn, resetBtn, timeline, speedControl, loopCheckbox, animationSelect,
                     showSkeleton, showMesh, xraySkeleton, resetCamera,
-                    currentTimeEl, durationEl, currentFrameEl, totalFramesEl
+                    currentTimeEl, currentFrameEl, totalFramesEl
                 };
 
                 // Wire up controls to send commands to iframe
@@ -592,10 +564,6 @@ app.registerExtension({
                     iframe.contentWindow.postMessage({ type: 'TOGGLE_XRAY', xray: e.target.checked }, '*');
                 });
 
-                resetCamera.addEventListener('click', () => {
-                    iframe.contentWindow.postMessage({ type: 'RESET_CAMERA' }, '*');
-                });
-
                 // Listen for messages from iframe
                 window.addEventListener('message', (event) => {
                     if (event.source !== iframe.contentWindow) return;
@@ -613,16 +581,12 @@ app.registerExtension({
 
                         case 'ANIMATIONS_LOADED':
                             console.log("[FBXAnimationViewer] ✓ Animations loaded successfully!");
-                            console.log("[FBXAnimationViewer] Animation count:", data.animations.length);
-                            console.log("[FBXAnimationViewer] Animation details:", data.animations);
-
                             animationSelect.innerHTML = '';
                             data.animations.forEach(anim => {
                                 const option = document.createElement('option');
                                 option.value = anim.index;
                                 option.textContent = anim.name;
                                 animationSelect.appendChild(option);
-                                console.log('[FBXAnimationViewer]   - Animation ' + anim.index + ': "' + anim.name + '" (' + anim.duration.toFixed(2) + 's)');
                             });
 
                             // Enable controls
@@ -632,14 +596,12 @@ app.registerExtension({
                             speedControl.disabled = false;
                             loopCheckbox.disabled = false;
                             animationSelect.disabled = data.animations.length <= 1;
-                            console.log("[FBXAnimationViewer] ✓ Controls enabled, ready to play");
                             break;
 
                         case 'TIME_UPDATE':
-                            currentTimeEl.textContent = data.time.toFixed(2) + 's';
-                            durationEl.textContent = '/ ' + data.duration.toFixed(2) + 's';
-                            currentFrameEl.textContent = data.frame;
-                            totalFramesEl.textContent = data.totalFrames;
+                            if (currentTimeEl) currentTimeEl.textContent = data.time.toFixed(2) + 's';
+                            if (currentFrameEl) currentFrameEl.textContent = data.frame;
+                            if (totalFramesEl) totalFramesEl.textContent = data.totalFrames;
                             timeline.value = data.progress;
                             break;
 
@@ -648,9 +610,8 @@ app.registerExtension({
                             break;
 
                         case 'ANIMATION_CHANGED':
-                            durationEl.textContent = '/ ' + data.duration.toFixed(2) + 's';
                             const fps = 30;
-                            totalFramesEl.textContent = Math.floor(data.duration * fps);
+                            if (totalFramesEl) totalFramesEl.textContent = Math.floor(data.duration * fps);
                             playPauseBtn.textContent = '⏸ Pause';
                             break;
 
@@ -662,35 +623,9 @@ app.registerExtension({
                     }
                 });
 
-                // Override onResize to update viewer container height
-                const originalOnResize = this.onResize;
-                this.onResize = function(size) {
-                    if (originalOnResize) {
-                        originalOnResize.apply(this, arguments);
-                    }
-                    const viewerHeight = Math.max(300, size[1] - 280);
-                    viewerContainer.style.height = viewerHeight + "px";
-                };
-
-                // Override onDrawForeground to sync viewer height
-                const originalOnDrawForeground = this.onDrawForeground;
-                this.onDrawForeground = function(ctx) {
-                    if (originalOnDrawForeground) {
-                        originalOnDrawForeground.apply(this, arguments);
-                    }
-                    const viewerHeight = Math.max(300, this.size[1] - 280);
-                    if (viewerContainer.style.height !== viewerHeight + "px") {
-                        viewerContainer.style.height = viewerHeight + "px";
-                    }
-                };
-
                 // Set initial node size
                 const nodeWidth = Math.max(512, this.size[0] || 512);
-                const nodeHeight = 600; // viewer (320) + controls (200) + overhead (80)
-                this.setSize([nodeWidth, nodeHeight]);
-
-                // Set initial viewer height
-                viewerContainer.style.height = "320px";
+                this.setSize([nodeWidth, 500]); // Slightly larger than widget height to account for header
 
                 console.log("[FBXAnimationViewer] Node setup complete");
                 return result;

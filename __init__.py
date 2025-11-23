@@ -30,6 +30,7 @@ from .nodes.bvh_viewer_node import BVHViewer
 from .nodes.bvh_retarget_node import BVHtoFBX
 from .nodes.compare_smpl_bvh_node import CompareSMPLtoBVH
 from .nodes.smpl_to_bvh_tpose import SMPLtoBVH_TPose
+from .nodes.bvh_loader_node import LoadBVHFromFolder
 
 # ComfyUI node registration
 NODE_CLASS_MAPPINGS = {
@@ -47,6 +48,7 @@ NODE_CLASS_MAPPINGS = {
     "BVHtoFBX": BVHtoFBX,
     "CompareSMPLtoBVH": CompareSMPLtoBVH,
     "SMPLtoBVH_TPose": SMPLtoBVH_TPose,
+    "LoadBVHFromFolder": LoadBVHFromFolder,
 }
 
 NODE_DISPLAY_NAME_MAPPINGS = {
@@ -64,6 +66,7 @@ NODE_DISPLAY_NAME_MAPPINGS = {
     "BVHtoFBX": "BVH to FBX Retargeter",
     "CompareSMPLtoBVH": "Compare SMPL vs BVH",
     "SMPLtoBVH_TPose": "SMPL to BVH (T-Pose Fix)",
+    "LoadBVHFromFolder": "Load BVH (Dropdown)",
 }
 
 # Module info
