@@ -501,11 +501,6 @@ def main():
         help="Download specific model only"
     )
     parser.add_argument(
-        "--install-blender",
-        action="store_true",
-        help="Install Blender for FBX retargeting support"
-    )
-    parser.add_argument(
         "--install-blender-addons",
         action="store_true",
         help="Install Blender addons (VRM and BVH Retargeter) for enhanced retargeting"
@@ -528,15 +523,14 @@ def main():
     # Print SMPL info
     print_smpl_info()
 
-    # Install Blender if requested
-    if args.install_blender:
-        blender_path = install_blender()
-        if blender_path:
-            print(f"\n✅ Blender installed successfully at: {blender_path}")
-        else:
-            print("\n⚠ Blender installation failed. You can:")
-            print("  • Install manually from https://www.blender.org/download/")
-            print("  • Or run: python install.py --install-blender")
+    # Install Blender automatically
+    blender_path = install_blender()
+    if blender_path:
+        print(f"\n✅ Blender installed successfully at: {blender_path}")
+    else:
+        print("\n⚠ Blender installation failed. You can:")
+        print("  • Install manually from https://www.blender.org/download/")
+        print("  • Or run: python install.py")
 
     # Install Blender addons if requested
     if args.install_blender_addons:
@@ -563,10 +557,7 @@ def main():
     print_header("Installation Complete!")
     print("✅ All models downloaded successfully!")
     print("🚀 You can now use ComfyUI-MotionCapture nodes in ComfyUI.")
-    if args.install_blender:
-        print("🎨 Blender installed for FBX retargeting support.")
-    else:
-        print("💡 To enable FBX retargeting, run: python install.py --install-blender")
+    print("🎨 Blender is now installed for FBX retargeting support.")
     if args.install_blender_addons:
         print("🔧 Blender addons installed for enhanced BVH retargeting.")
     else:
