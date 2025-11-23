@@ -8,6 +8,7 @@ import { app } from "../../scripts/app.js";
 console.log("[FBXAnimationViewer] Loading FBX Animation Viewer extension");
 
 // Inline HTML viewer - NO CONTROLS, just the 3D view
+// Using string concatenation to avoid nested backtick issues
 const ANIMATION_VIEWER_HTML = `
 <!DOCTYPE html>
 <html>
@@ -38,7 +39,7 @@ const ANIMATION_VIEWER_HTML = `
             "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.160.0/examples/jsm/"
         }
     }
-    </script>
+    <\/script>
 
     <script type="module">
         import * as THREE from 'three';
@@ -107,10 +108,10 @@ const ANIMATION_VIEWER_HTML = `
         function loadFBX(path) {
             const loader = new FBXLoader();
 
-            // Ensure absolute URL if not already (parent sends absolute, but be safe)
-            const url = path.startsWith('http') || path.startsWith('blob:')
+            // Ensure absolute URL
+            const url = (path.startsWith('http') || path.startsWith('blob:'))
                 ? path
-                : \`\${window.parent.location.origin}\${path}\`;
+                : window.parent.location.origin + path;
 
             loader.load(
                 url,
@@ -133,10 +134,12 @@ const ANIMATION_VIEWER_HTML = `
                             child.castShadow = true;
                             child.receiveShadow = true;
                             child.visible = showMesh;
-                            console.log(`[FBXAnimationViewer] Mesh found: ${child.name}, vertices: ${child.geometry.attributes.position.count}, visible: ${child.visible}`);
+                            // Replaced template literal with concatenation
+                            console.log('[FBXAnimationViewer] Mesh found: ' + child.name + ', vertices: ' + child.geometry.attributes.position.count + ', visible: ' + child.visible);
                         }
                     });
-                    console.log(`[FBXAnimationViewer] Total meshes loaded: ${meshCount}`);
+                    // Replaced template literal with concatenation
+                    console.log('[FBXAnimationViewer] Total meshes loaded: ' + meshCount);
 
                     // Create skeleton helper
                     const skeleton = fbx.children.find(child => child.isSkinnedMesh)?.skeleton;
@@ -149,7 +152,7 @@ const ANIMATION_VIEWER_HTML = `
 
                     // Setup animations
                     animations = fbx.animations || [];
-                    console.log(\`[FBXAnimationViewer] Found \${animations.length} animation(s)\`);
+                    console.log('[FBXAnimationViewer] Found ' + animations.length + ' animation(s)');
 
                     if (animations.length > 0) {
                         setupAnimations();
@@ -164,7 +167,7 @@ const ANIMATION_VIEWER_HTML = `
                 },
                 (xhr) => {
                     const percent = (xhr.loaded / xhr.total * 100).toFixed(0);
-                    document.getElementById('loading').textContent = \`Loading... \${percent}%\`;
+                    document.getElementById('loading').textContent = 'Loading... ' + percent + '%';
                 },
                 (error) => {
                     console.error('[FBXAnimationViewer] Error loading FBX:', error);
@@ -179,7 +182,7 @@ const ANIMATION_VIEWER_HTML = `
             // Notify parent of available animations
             const animationNames = animations.map((clip, i) => ({
                 index: i,
-                name: clip.name || \`Animation \${i + 1}\`,
+                name: clip.name || ('Animation ' + (i + 1)),
                 duration: clip.duration
             }));
             notifyParent({
@@ -619,7 +622,7 @@ app.registerExtension({
                                 option.value = anim.index;
                                 option.textContent = anim.name;
                                 animationSelect.appendChild(option);
-                                console.log(`[FBXAnimationViewer]   - Animation ${anim.index}: "${anim.name}" (${anim.duration.toFixed(2)}s)`);
+                                console.log('[FBXAnimationViewer]   - Animation ' + anim.index + ': "' + anim.name + '" (' + anim.duration.toFixed(2) + 's)');
                             });
 
                             // Enable controls
@@ -722,7 +725,7 @@ app.registerExtension({
                 }
 
                 // Construct absolute URL (iframe runs from blob URL, needs absolute path)
-                const viewPath = `${window.location.origin}/view?filename=${encodeURIComponent(relativePath)}`;
+                const viewPath = window.location.origin + "/view?filename=" + encodeURIComponent(relativePath);
                 console.log("[FBXAnimationViewer] Sending LOAD_FBX message to iframe");
                 console.log("[FBXAnimationViewer] Relative path:", relativePath);
                 console.log("[FBXAnimationViewer] View URL:", viewPath);

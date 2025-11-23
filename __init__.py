@@ -28,6 +28,8 @@ from .nodes.fbx_animation_viewer_node import FBXAnimationViewer
 from .nodes.smpl_to_bvh_node import SMPLtoBVH
 from .nodes.bvh_viewer_node import BVHViewer
 from .nodes.bvh_retarget_node import BVHtoFBX
+from .nodes.compare_smpl_bvh_node import CompareSMPLtoBVH
+from .nodes.smpl_to_bvh_tpose import SMPLtoBVH_TPose
 
 # ComfyUI node registration
 NODE_CLASS_MAPPINGS = {
@@ -43,6 +45,8 @@ NODE_CLASS_MAPPINGS = {
     "SMPLtoBVH": SMPLtoBVH,
     "BVHViewer": BVHViewer,
     "BVHtoFBX": BVHtoFBX,
+    "CompareSMPLtoBVH": CompareSMPLtoBVH,
+    "SMPLtoBVH_TPose": SMPLtoBVH_TPose,
 }
 
 NODE_DISPLAY_NAME_MAPPINGS = {
@@ -58,6 +62,8 @@ NODE_DISPLAY_NAME_MAPPINGS = {
     "SMPLtoBVH": "SMPL to BVH Converter",
     "BVHViewer": "BVH Animation Viewer",
     "BVHtoFBX": "BVH to FBX Retargeter",
+    "CompareSMPLtoBVH": "Compare SMPL vs BVH",
+    "SMPLtoBVH_TPose": "SMPL to BVH (T-Pose Fix)",
 }
 
 # Module info
@@ -80,6 +86,8 @@ print(f"  - FBXAnimationViewer: Animated FBX playback viewer")
 print(f"  - SMPLtoBVH: Convert SMPL motion to BVH format")
 print(f"  - BVHViewer: Interactive 3D viewer for BVH animations")
 print(f"  - BVHtoFBX: Retarget BVH motion to FBX/VRM characters")
+print(f"  - CompareSMPLtoBVH: Side-by-side comparison of SMPL and BVH animations")
+print(f"  - SMPLtoBVH_TPose: SMPL to BVH (T-Pose Fix) with arm axis correction")
 print(f"{'='*60}\n")
 
 # Web extensions path for ComfyUI
@@ -125,6 +133,21 @@ try:
             return web.json_response([])
 
     print("[MotionCapture] API endpoint registered: /motioncapture/npz_files")
+
+    @PromptServer.instance.routes.get('/motioncapture/smpl_mesh')
+    async def get_smpl_mesh_file(request):
+        """API endpoint to fetch SMPL mesh binary file."""
+        filename = request.query.get('filename', None)
+        if not filename:
+            raise web.HTTPBadRequest(reason="Missing filename parameter")
+
+        filepath = Path("output") / filename
+        if not filepath.is_file():
+            raise web.HTTPNotFound(reason=f"File not found: {filename}")
+
+        return web.FileResponse(filepath)
+
+    print("[MotionCapture] API endpoint registered: /motioncapture/smpl_mesh")
 
 except Exception as e:
     print(f"[MotionCapture] Warning: Could not register API endpoints: {e}")

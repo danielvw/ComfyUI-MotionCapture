@@ -120,10 +120,11 @@ SMPL_23_PARENTS = [
 ]
 
 # Joint offsets in meters (approximate SMPL T-pose)
+# FIXED: Swapped X offsets for L/R sides to match SMPL coordinate system (Left is +X, Right is -X)
 SMPL_OFFSETS = {
     0: [0.0, 0.0, 0.0],          # Pelvis (root, no offset)
-    1: [-0.1, -0.04, 0.0],       # L_Hip
-    2: [0.1, -0.04, 0.0],        # R_Hip
+    1: [0.1, -0.04, 0.0],        # L_Hip (was -0.1)
+    2: [-0.1, -0.04, 0.0],       # R_Hip (was 0.1)
     3: [0.0, 0.1, 0.0],          # Spine1
     4: [0.0, -0.4, 0.0],         # L_Knee
     5: [0.0, -0.4, 0.0],         # R_Knee
@@ -134,11 +135,11 @@ SMPL_OFFSETS = {
     10: [0.0, -0.05, 0.1],       # L_Foot
     11: [0.0, -0.05, 0.1],       # R_Foot
     12: [0.0, 0.1, 0.0],         # Neck
-    13: [-0.15, 0.0, 0.0],       # L_Collar
-    14: [0.15, 0.0, 0.0],        # R_Collar
+    13: [0.15, 0.0, 0.0],        # L_Collar (was -0.15)
+    14: [-0.15, 0.0, 0.0],       # R_Collar (was 0.15)
     15: [0.0, 0.15, 0.0],        # Head
-    16: [-0.1, 0.0, 0.0],        # L_Shoulder
-    17: [0.1, 0.0, 0.0],         # R_Shoulder
+    16: [0.1, 0.0, 0.0],         # L_Shoulder (was -0.1)
+    17: [-0.1, 0.0, 0.0],        # R_Shoulder (was 0.1)
     18: [0.0, -0.25, 0.0],       # L_Elbow
     19: [0.0, -0.25, 0.0],       # R_Elbow
     20: [0.0, -0.25, 0.0],       # L_Wrist

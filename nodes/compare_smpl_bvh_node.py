@@ -100,22 +100,31 @@ class CompareSMPLtoBVH:
             vertices_array = np.stack(vertices_list, axis=0)  # (F, V, 3)
             faces = smpl_model.faces.astype(np.int32)  # (Nf, 3)
 
-            # Save mesh to .npz file
+            # Save mesh to custom binary format (.bin) for easier JS loading
             output_dir = Path("output")
             output_dir.mkdir(parents=True, exist_ok=True)
             timestamp = int(time.time() * 1000)
-            mesh_filename = f"smpl_mesh_{timestamp}.npz"
+            mesh_filename = f"smpl_mesh_{timestamp}.bin"
             mesh_filepath = output_dir / mesh_filename
 
-            np.savez_compressed(
-                mesh_filepath,
-                vertices=vertices_array,
-                faces=faces,
-                fps=30,
-                num_frames=num_frames
-            )
+            # Create binary header and data
+            # Header: Magic(4), Frames(4), Verts(4), Faces(4), FPS(4)
+            magic = b"SMPL"
+            num_frames_u32 = np.array([num_frames], dtype=np.uint32)
+            num_verts_u32 = np.array([vertices_array.shape[1]], dtype=np.uint32)
+            num_faces_u32 = np.array([faces.shape[0]], dtype=np.uint32)
+            fps_f32 = np.array([30.0], dtype=np.float32)
 
-            Log.info(f"[CompareSMPLtoBVH] Saved mesh to {mesh_filepath} ({vertices_array.nbytes / 1024 / 1024:.1f} MB uncompressed)")
+            with open(mesh_filepath, "wb") as f:
+                f.write(magic)
+                f.write(num_frames_u32.tobytes())
+                f.write(num_verts_u32.tobytes())
+                f.write(num_faces_u32.tobytes())
+                f.write(fps_f32.tobytes())
+                f.write(vertices_array.astype(np.float32).tobytes())
+                f.write(faces.astype(np.uint32).tobytes())
+
+            Log.info(f"[CompareSMPLtoBVH] Saved mesh to {mesh_filepath} ({mesh_filepath.stat().st_size / 1024 / 1024:.1f} MB)")
 
             # Read BVH file content
             bvh_file_path = bvh_data.get("file_path", "")
@@ -125,8 +134,9 @@ class CompareSMPLtoBVH:
             with open(bvh_file_path, 'r') as f:
                 bvh_content = f.read()
 
-            # Store data for web viewer (file paths instead of data)
-            self.smpl_mesh_file = str(mesh_filepath)
+            # Store data for web viewer
+            # Send just the filename so JS can fetch via /view?filename=...
+            self.smpl_mesh_filename = mesh_filename
             self.bvh_content = bvh_content
             self.bvh_info = {
                 "num_frames": bvh_data.get("num_frames", 0),
@@ -147,11 +157,9 @@ class CompareSMPLtoBVH:
             Log.info(f"[CompareSMPLtoBVH] Ready for comparison - SMPL: {smpl_frames} frames, BVH: {bvh_frames} frames")
 
             # Return data in ComfyUI OUTPUT_NODE format
-            # The "ui" dict is sent to the frontend JavaScript
-            # Send file path instead of mesh data to avoid large JSON
             return {
                 "ui": {
-                    "smpl_mesh_file": [self.smpl_mesh_file],
+                    "smpl_mesh_filename": [self.smpl_mesh_filename],
                     "bvh_content": [self.bvh_content],
                     "bvh_info": [self.bvh_info]
                 },

@@ -40,7 +40,7 @@ wis3d
 pycolmap
 
 # BVH (Biovision Hierarchy) file format support
-bvh>=0.4.0
+bvh>=0.3
 
 # 2D pose estimation (ViTPose dependencies)
 # Note: ultralytics (YOLO) is NOT needed as we use SAM3 for segmentation

@@ -130,11 +130,11 @@ SMPL_23_PARENTS = [
 ]
 
 # Joint offsets in meters (TRUE T-POSE - arms horizontal!)
-# FIXED: Elbows and wrists now extend horizontally to create proper T-pose
+# FIXED: Swapped X offsets for L/R sides to match SMPL coordinate system (Left is +X, Right is -X)
 SMPL_OFFSETS_TPOSE = {
     0: [0.0, 0.0, 0.0],          # Pelvis (root, no offset)
-    1: [-0.1, -0.04, 0.0],       # L_Hip
-    2: [0.1, -0.04, 0.0],        # R_Hip
+    1: [0.1, -0.04, 0.0],        # L_Hip (was -0.1)
+    2: [-0.1, -0.04, 0.0],       # R_Hip (was 0.1)
     3: [0.0, 0.1, 0.0],          # Spine1
     4: [0.0, -0.4, 0.0],         # L_Knee
     5: [0.0, -0.4, 0.0],         # R_Knee
@@ -145,17 +145,17 @@ SMPL_OFFSETS_TPOSE = {
     10: [0.0, -0.05, 0.1],       # L_Foot
     11: [0.0, -0.05, 0.1],       # R_Foot
     12: [0.0, 0.1, 0.0],         # Neck
-    13: [-0.15, 0.0, 0.0],       # L_Collar (horizontal)
-    14: [0.15, 0.0, 0.0],        # R_Collar (horizontal)
+    13: [0.15, 0.0, 0.0],        # L_Collar (was -0.15)
+    14: [-0.15, 0.0, 0.0],       # R_Collar (was 0.15)
     15: [0.0, 0.15, 0.0],        # Head
-    16: [-0.1, 0.0, 0.0],        # L_Shoulder (horizontal)
-    17: [0.1, 0.0, 0.0],         # R_Shoulder (horizontal)
-    18: [-0.25, 0.0, 0.0],       # L_Elbow (FIXED: horizontal left, not down!)
-    19: [0.25, 0.0, 0.0],        # R_Elbow (FIXED: horizontal right, not down!)
-    20: [-0.25, 0.0, 0.0],       # L_Wrist (FIXED: horizontal left)
-    21: [0.25, 0.0, 0.0],        # R_Wrist (FIXED: horizontal right)
-    22: [-0.05, 0.0, 0.0],       # L_Hand (horizontal)
-    23: [0.05, 0.0, 0.0],        # R_Hand (horizontal)
+    16: [0.1, 0.0, 0.0],         # L_Shoulder (was -0.1)
+    17: [-0.1, 0.0, 0.0],        # R_Shoulder (was 0.1)
+    18: [0.25, 0.0, 0.0],        # L_Elbow (was -0.25)
+    19: [-0.25, 0.0, 0.0],       # R_Elbow (was 0.25)
+    20: [0.25, 0.0, 0.0],        # L_Wrist (was -0.25)
+    21: [-0.25, 0.0, 0.0],       # R_Wrist (was 0.25)
+    22: [0.05, 0.0, 0.0],        # L_Hand (was -0.05)
+    23: [-0.05, 0.0, 0.0],       # R_Hand (was 0.05)
 }
 
 
@@ -190,6 +190,9 @@ class SMPLtoBVH_TPose:
                     "step": 0.01,
                     "round": 0.01,
                 }),
+                "arm_x_fix": ("FLOAT", {"default": 1.0, "min": -1.0, "max": 1.0, "step": 2.0}),
+                "arm_y_fix": ("FLOAT", {"default": 1.0, "min": -1.0, "max": 1.0, "step": 2.0}),
+                "arm_z_fix": ("FLOAT", {"default": 1.0, "min": -1.0, "max": 1.0, "step": 2.0}),
             },
         }
 
@@ -205,18 +208,12 @@ class SMPLtoBVH_TPose:
         output_path: str,
         fps: int = 30,
         scale: float = 1.0,
+        arm_x_fix: float = 1.0,
+        arm_y_fix: float = 1.0,
+        arm_z_fix: float = 1.0,
     ) -> Tuple[Dict, str, str]:
         """
         Convert SMPL parameters to BVH file format with T-pose offsets.
-
-        Args:
-            smpl_params: SMPL parameters from GVHMRInference or LoadSMPL
-            output_path: Path to save BVH file
-            fps: Frames per second for the animation
-            scale: Scale factor for the skeleton (1.0 = meters, 100.0 = centimeters)
-
-        Returns:
-            Tuple of (bvh_data_dict, file_path, info_string)
         """
         try:
             Log.info("[SMPLtoBVH T-Pose] Converting SMPL to BVH format with TRUE T-POSE offsets...")
@@ -289,7 +286,8 @@ class SMPLtoBVH_TPose:
             frame_time = 1.0 / fps
 
             # Convert axis-angle rotations to Euler angles (ZXY order, BVH standard)
-            euler_rotations = self._axis_angle_to_euler(full_pose)  # [F, num_total_joints, 3]
+            # Pass correction factors
+            euler_rotations = self._axis_angle_to_euler(full_pose, arm_x_fix, arm_y_fix, arm_z_fix)
 
             # Validate rotation ranges to detect potential issues
             rot_mins = np.min(euler_rotations, axis=(0, 1))
@@ -348,12 +346,13 @@ class SMPLtoBVH_TPose:
             traceback.print_exc()
             return ({}, "", error_msg)
 
-    def _axis_angle_to_euler(self, axis_angle: np.ndarray) -> np.ndarray:
+    def _axis_angle_to_euler(self, axis_angle: np.ndarray, x_fix: float, y_fix: float, z_fix: float) -> np.ndarray:
         """
         Convert axis-angle rotations to Euler angles (ZXY order for BVH).
 
         Args:
             axis_angle: [F, J, 3] axis-angle rotations
+            x_fix, y_fix, z_fix: Multipliers for arm rotation axes
 
         Returns:
             [F, J, 3] Euler angles in degrees (ZXY order)
@@ -376,6 +375,17 @@ class SMPLtoBVH_TPose:
                 # BVH uses ZXY intrinsic Euler angles in degrees
                 # IMPORTANT: Use uppercase 'ZXY' for intrinsic rotations (not lowercase 'zxy' for extrinsic)
                 euler_angles = rot.as_euler('ZXY', degrees=True)
+                
+                # Apply fixes to arm joints (Shoulders, Elbows, Wrists, Hands)
+                # Joints 16-23 are the arm chain (L_Shoulder to R_Hand)
+                if 16 <= joint <= 23:
+                    # euler_angles is [Z, X, Y] due to 'ZXY' order?
+                    # NO: scipy returns [alpha, beta, gamma] corresponding to axes 'Z', 'X', 'Y'.
+                    # So index 0 is Z, 1 is X, 2 is Y.
+                    euler_angles[0] *= z_fix # Z
+                    euler_angles[1] *= x_fix # X
+                    euler_angles[2] *= y_fix # Y
+
                 euler[frame, joint] = euler_angles
 
         return euler
