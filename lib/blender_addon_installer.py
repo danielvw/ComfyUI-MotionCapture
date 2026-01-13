@@ -21,15 +21,29 @@ BVH_RETARGETER_URL = "https://github.com/Diffeomorphic/retarget-bvh/archive/refs
 ROKOKO_ADDON_URL = "https://github.com/Rokoko/rokoko-studio-live-blender/archive/refs/tags/v1-4-3.zip"
 
 def get_local_blender_path():
-    """Find the local portable Blender installation."""
-    # This script is in lib/blender_addon_installer.py
-    # Blender is in lib/blender/...
+    """Find Blender installation using centralized config."""
+    # Import BlenderConfig
+    try:
+        from blender_config import BlenderConfig
+        config = BlenderConfig()
+        blender_exe = config.find_blender_executable()
+
+        if blender_exe:
+            log_info(f"Found Blender via BlenderConfig: {blender_exe}")
+            return blender_exe
+    except ImportError:
+        log_error("Could not import blender_config module")
+    except Exception as e:
+        log_error(f"BlenderConfig failed: {e}")
+
+    # Fallback to old logic
+    log_info("Falling back to local search in lib/blender/")
     base_dir = Path(__file__).parent.absolute()
     blender_dir = base_dir / "blender"
-    
+
     if not blender_dir.exists():
         return None
-        
+
     # Find the executable
     system = platform.system().lower()
     pattern = "**/blender"
@@ -37,11 +51,11 @@ def get_local_blender_path():
         pattern = "**/blender.exe"
     elif system == "darwin":
         pattern = "**/MacOS/blender"
-        
+
     executables = list(blender_dir.glob(pattern))
     if executables:
         return executables[0]
-        
+
     return None
 
 def get_addons_dir(blender_executable):
