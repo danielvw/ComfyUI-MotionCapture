@@ -230,8 +230,13 @@ class MHRtoBVH:
         for frame in range(num_frames):
             kp = keypoints_3d[frame]  # [70, 3]
 
+            # Flip Y axis for entire skeleton to correct coordinate system
+            # MHR uses Y-up, but we need to invert Y for proper BVH orientation
+            kp_flipped = kp.copy()
+            kp_flipped[:, 1] = -kp_flipped[:, 1]
+
             # Extract BVH joint positions from MHR keypoints
-            bvh_positions = extract_bvh_positions_from_mhr(kp, include_hands)
+            bvh_positions = extract_bvh_positions_from_mhr(kp_flipped, include_hands)
 
             # Compute root translation (pelvis position)
             translations[frame] = bvh_positions[0]
