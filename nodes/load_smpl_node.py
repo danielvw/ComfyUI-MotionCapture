@@ -57,15 +57,24 @@ class LoadSMPL:
 
     @classmethod
     def INPUT_TYPES(cls):
+        # Get files from both directories
+        input_files = cls.get_npz_files_from_input()
+        output_files = cls.get_npz_files_from_output()
+
+        # Combine and prefix with folder name for clarity
+        all_files = []
+        if output_files:
+            all_files.extend([f"output/{f}" for f in output_files])
+        if input_files:
+            all_files.extend([f"input/{f}" for f in input_files])
+
+        # Fallback if no files found
+        if not all_files:
+            all_files = ["[No NPZ files found]"]
+
         return {
             "required": {
-                "npz_file": ("COMBO", {
-                    "remote": {
-                        "route": "/motioncapture/npz_files",
-                        "refresh_button": True,
-                    },
-                }),
-                "source_folder": (["output", "input"],),
+                "npz_file": (all_files,),
             },
         }
 
@@ -77,14 +86,12 @@ class LoadSMPL:
     def load_smpl(
         self,
         npz_file: str,
-        source_folder: str,
     ) -> Tuple[Dict, str]:
         """
         Load SMPL parameters from NPZ file.
 
         Args:
-            npz_file: Relative path to NPZ file within source folder
-            source_folder: Source folder ("input" or "output")
+            npz_file: File path in format "output/file.npz" or "input/file.npz"
 
         Returns:
             Tuple of (smpl_params, info_string)
@@ -92,10 +99,19 @@ class LoadSMPL:
         try:
             Log.info("[LoadSMPL] Loading SMPL motion data...")
 
-            # Get base directory based on source folder
-            if source_folder == "input":
+            # Check for placeholder
+            if npz_file == "[No NPZ files found]":
+                raise ValueError("No NPZ files found in input or output directories")
+
+            # Parse folder from path
+            if npz_file.startswith("output/"):
+                base_dir = folder_paths.get_output_directory()
+                npz_file = npz_file[7:]  # Remove "output/" prefix
+            elif npz_file.startswith("input/"):
                 base_dir = folder_paths.get_input_directory()
+                npz_file = npz_file[6:]  # Remove "input/" prefix
             else:
+                # Fallback to output if no prefix
                 base_dir = folder_paths.get_output_directory()
 
             # Construct full path
