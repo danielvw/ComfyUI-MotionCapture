@@ -488,30 +488,36 @@ def main():
             config.config['version'] = args.blender_version
             print(f"[CLI Override] Using Blender version: {args.blender_version}")
 
-    # Get ComfyUI models directory (not in the custom node repo!)
-    base_dir = Path(__file__).parent.parent.parent / "models" / "motion_capture"
-    base_dir.mkdir(parents=True, exist_ok=True)
-
-    # Download models
-    if args.model:
-        # Download specific model
-        model_info = MODELS[args.model]
-        success = download_model(args.model, model_info, base_dir, args.force)
+    # If only installing Blender addons, skip model downloads
+    if args.install_blender_addons and not args.model and not args.force:
+        # Skip model downloads, go straight to addon installation
+        print("\n[INFO] Skipping model downloads (use without --install-blender-addons to download models)")
+        success = True
     else:
-        # Download all models
-        success = download_all_models(base_dir, args.force)
+        # Get ComfyUI models directory (not in the custom node repo!)
+        base_dir = Path(__file__).parent.parent.parent / "models" / "motion_capture"
+        base_dir.mkdir(parents=True, exist_ok=True)
 
-    # Print SMPL info
-    print_smpl_info()
+        # Download models
+        if args.model:
+            # Download specific model
+            model_info = MODELS[args.model]
+            success = download_model(args.model, model_info, base_dir, args.force)
+        else:
+            # Download all models
+            success = download_all_models(base_dir, args.force)
 
-    # Install Blender automatically
-    blender_path = install_blender()
-    if blender_path:
-        print(f"\n[OK] Blender installed successfully at: {blender_path}")
-    else:
-        print("\n[WARNING] Blender installation failed. You can:")
-        print("  - Install manually from https://www.blender.org/download/")
-        print("  - Or run: python install.py")
+        # Print SMPL info
+        print_smpl_info()
+
+        # Install Blender automatically
+        blender_path = install_blender()
+        if blender_path:
+            print(f"\n[OK] Blender installed successfully at: {blender_path}")
+        else:
+            print("\n[WARNING] Blender installation failed. You can:")
+            print("  - Install manually from https://www.blender.org/download/")
+            print("  - Or run: python install.py")
 
     # Install Blender addons if requested
     if args.install_blender_addons:
