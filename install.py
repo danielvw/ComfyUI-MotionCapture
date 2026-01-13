@@ -231,7 +231,7 @@ def get_platform_info():
 
 def get_blender_download_url(platform_name, architecture):
     """
-    Get Blender 4.2 LTS download URL for the platform.
+    Get Blender download URL for the platform using BlenderConfig.
 
     Args:
         platform_name: "linux", "macos", or "windows"
@@ -240,39 +240,15 @@ def get_blender_download_url(platform_name, architecture):
     Returns:
         tuple: (download_url, version, filename) or (None, None, None) if not found
     """
-    version = "4.2.3"
-    base_url = "https://download.blender.org/release/Blender4.2"
+    # Import BlenderConfig
+    lib_path = Path(__file__).parent / "lib"
+    if str(lib_path) not in sys.path:
+        sys.path.insert(0, str(lib_path))
 
-    urls = {
-        ("linux", "x64"): (
-            f"{base_url}/blender-{version}-linux-x64.tar.xz",
-            version,
-            f"blender-{version}-linux-x64.tar.xz"
-        ),
-        ("macos", "x64"): (
-            f"{base_url}/blender-{version}-macos-x64.dmg",
-            version,
-            f"blender-{version}-macos-x64.dmg"
-        ),
-        ("macos", "arm64"): (
-            f"{base_url}/blender-{version}-macos-arm64.dmg",
-            version,
-            f"blender-{version}-macos-arm64.dmg"
-        ),
-        ("windows", "x64"): (
-            f"{base_url}/blender-{version}-windows-x64.zip",
-            version,
-            f"blender-{version}-windows-x64.zip"
-        ),
-    }
+    from blender_config import BlenderConfig
 
-    key = (platform_name, architecture)
-    if key in urls:
-        url, ver, filename = urls[key]
-        print(f"[MotionCapture Install] Using Blender {ver} for {platform_name}-{architecture}")
-        return url, ver, filename
-
-    return None, None, None
+    config = BlenderConfig()
+    return config.get_download_url(platform_name, architecture)
 
 
 def download_file(url, dest_path):
@@ -482,7 +458,35 @@ def main():
         action="store_true",
         help="Install Blender addons (VRM and BVH Retargeter) for enhanced retargeting"
     )
+    parser.add_argument(
+        "--blender-path",
+        type=str,
+        help="Custom path to Blender executable (overrides config file)"
+    )
+    parser.add_argument(
+        "--blender-version",
+        type=str,
+        help="Blender version to install (e.g., '4.3.0')"
+    )
     args = parser.parse_args()
+
+    # Handle CLI-based Blender config overrides
+    if args.blender_path or args.blender_version:
+        # Temporarily update config for this run
+        lib_path = Path(__file__).parent / "lib"
+        if str(lib_path) not in sys.path:
+            sys.path.insert(0, str(lib_path))
+
+        from blender_config import BlenderConfig
+        config = BlenderConfig()
+
+        if args.blender_path:
+            config.config['custom_path'] = args.blender_path
+            print(f"[CLI Override] Using custom Blender path: {args.blender_path}")
+
+        if args.blender_version:
+            config.config['version'] = args.blender_version
+            print(f"[CLI Override] Using Blender version: {args.blender_version}")
 
     # Get ComfyUI models directory (not in the custom node repo!)
     base_dir = Path(__file__).parent.parent.parent / "models" / "motion_capture"

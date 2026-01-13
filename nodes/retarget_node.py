@@ -159,32 +159,19 @@ class SMPLToFBX:
             return ("", error_msg)
 
     def _find_blender(self) -> Path:
-        """Find Blender executable."""
-        # Check local installation first
-        local_blender = Path(__file__).parent.parent / "lib" / "blender"
+        """Find Blender executable using centralized config."""
+        # Add lib path for config module
+        lib_path = Path(__file__).parent.parent / "lib"
+        if str(lib_path) not in sys.path:
+            sys.path.insert(0, str(lib_path))
 
-        if local_blender.exists():
-            import platform
+        from blender_config import get_blender_executable
 
-            system = platform.system().lower()
-            if system == "windows":
-                pattern = "**/blender.exe"
-            elif system == "darwin":
-                pattern = "**/MacOS/blender"
-            else:
-                pattern = "**/blender"
-
-            executables = list(local_blender.glob(pattern))
-            if executables:
-                return executables[0]
-
-        # Check system PATH
-        import shutil
-        system_blender = shutil.which("blender")
-        if system_blender:
-            return Path(system_blender)
-
-        return None
+        try:
+            return get_blender_executable()
+        except RuntimeError as e:
+            # Re-raise with context
+            raise RuntimeError(f"Blender not found: {e}") from e
 
     def _save_smpl_params(self, smpl_params: Dict, output_path: Path):
         """Save SMPL parameters to npz file for Blender."""

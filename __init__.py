@@ -38,6 +38,8 @@ from .nodes.sam3d_loader_node import LoadSAM3DBodyModels
 from .nodes.sam3d_inference_node import SAM3DVideoInference
 from .nodes.mhr_viewer_node import MHRViewer
 from .nodes.save_mhr_node import SaveMHR
+from .nodes.mhr_to_bvh_node import MHRtoBVH
+from .nodes.mhr_to_fbx_node import MHRToFBX
 
 # ComfyUI node registration
 NODE_CLASS_MAPPINGS = {
@@ -61,6 +63,8 @@ NODE_CLASS_MAPPINGS = {
     "SAM3DVideoInference": SAM3DVideoInference,
     "MHRViewer": MHRViewer,
     "SaveMHR": SaveMHR,
+    "MHRtoBVH": MHRtoBVH,
+    "MHRToFBX": MHRToFBX,
 }
 
 NODE_DISPLAY_NAME_MAPPINGS = {
@@ -84,6 +88,8 @@ NODE_DISPLAY_NAME_MAPPINGS = {
     "SAM3DVideoInference": "SAM3D Video Inference",
     "MHRViewer": "MHR Skeleton Viewer",
     "SaveMHR": "Save MHR Motion",
+    "MHRtoBVH": "MHR to BVH Converter",
+    "MHRToFBX": "MHR to FBX Export",
 }
 
 # Module info
@@ -103,6 +109,8 @@ print(f"  - LoadSAM3DBodyModels: Load SAM 3D Body model")
 print(f"  - SAM3DVideoInference: Run SAM3D inference with temporal smoothing")
 print(f"  - MHRViewer: Interactive 3D skeleton viewer for MHR output")
 print(f"  - SaveMHR: Save MHR motion data to disk")
+print(f"  - MHRtoBVH: Convert MHR motion to BVH format")
+print(f"  - MHRToFBX: Export MHR motion to animated FBX")
 print(f"")
 print(f"Common Nodes:")
 print(f"  - SMPLViewer: Interactive 3D viewer for SMPL meshes")

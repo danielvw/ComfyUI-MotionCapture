@@ -70,9 +70,9 @@ dependencies = [
 ]
 
 [project.urls]
-Repository = "https://github.com/PozzettiAndrea/ComfyUI-MotionCapture"
-Documentation = "https://github.com/PozzettiAndrea/ComfyUI-MotionCapture#readme"
-"Bug Tracker" = "https://github.com/PozzettiAndrea/ComfyUI-MotionCapture/issues"
+Repository = "https://github.com/danielvw/ComfyUI-MotionCapture"
+Documentation = "https://github.com/danielvw/ComfyUI-MotionCapture#readme"
+"Bug Tracker" = "https://github.com/danielvw/ComfyUI-MotionCapture/issues"
 
 # ComfyUI Registry configuration
 [tool.comfy]

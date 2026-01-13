@@ -32,5 +32,8 @@ _hf_cache/
 lib/blender/
 _temp_blender_download/
 
+# User-specific Blender configuration
+blender_config.yaml
+
 # Temp files for retargeting
 temp/

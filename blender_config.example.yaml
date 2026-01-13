@@ -1,0 +1,80 @@
+# Blender Configuration for ComfyUI-MotionCapture
+# =================================================
+# This file is a template - copy it to "blender_config.yaml" to customize your Blender settings.
+# If blender_config.yaml doesn't exist, default auto-detection will be used.
+
+blender:
+  # Custom Blender executable path (highest priority)
+  # ---------------------------------------------------------------------------
+  # Specify the full path to your Blender executable to override auto-detection.
+  # Leave as null to use automatic detection (lib/blender/ or system PATH).
+  #
+  # Platform-specific examples:
+  #   Linux:   /usr/local/blender/blender
+  #   Linux:   /opt/blender-4.3.0/blender
+  #   macOS:   /Applications/Blender.app/Contents/MacOS/blender
+  #   Windows: C:/Program Files/Blender Foundation/Blender 4.2/blender.exe
+  #   Windows: D:/Software/Blender/blender.exe
+  #
+  # Note: macOS users must point to the executable inside the .app bundle:
+  #       /Applications/Blender.app/Contents/MacOS/blender (NOT just Blender.app)
+  custom_path: null
+
+  # Blender version for automatic installation
+  # ---------------------------------------------------------------------------
+  # Specify which Blender version to download when running install.py --install-blender
+  # Format: "Major.Minor.Patch" (e.g., "4.3.0", "4.2.3", "3.6.5")
+  # Leave as null to use the default LTS version (4.2.3)
+  #
+  # Examples:
+  #   version: "4.3.0"    # Latest stable
+  #   version: "4.2.3"    # LTS (Long Term Support) - Default
+  #   version: "4.1.1"    # Older stable version
+  version: null
+
+  # Custom download base URL
+  # ---------------------------------------------------------------------------
+  # Advanced: Override the base URL for Blender downloads.
+  # Only needed if you're using a mirror or custom repository.
+  # Default: https://download.blender.org/release
+  #
+  # Example:
+  #   download_base_url: "https://mirror.example.com/blender/release"
+  download_base_url: null
+
+
+# Detection Priority Order
+# =================================================
+# ComfyUI-MotionCapture searches for Blender in this order:
+#   1. custom_path (if set in blender_config.yaml)
+#   2. Local installation (lib/blender/ directory)
+#   3. System PATH (system-wide Blender installation)
+#
+# If no Blender is found, you'll see an error with installation instructions.
+
+
+# Getting Started
+# =================================================
+# 1. Copy this file to "blender_config.yaml" in the project root:
+#       cp blender_config.example.yaml blender_config.yaml
+#
+# 2. Edit blender_config.yaml and uncomment/modify the settings you need
+#
+# 3. Example: Use existing Blender installation
+#       custom_path: /usr/local/blender-4.3.0/blender
+#
+# 4. Example: Auto-install specific version
+#       version: "4.3.0"
+#       Then run: python install.py --install-blender
+
+
+# Compatibility Notes
+# =================================================
+# Recommended: Blender 4.2+ (LTS with portable directory structure)
+#
+# Addon compatibility:
+#   - VRM Addon (v2.20.88):           Blender 2.93 - 4.2+
+#   - BVH Retargeter:                 Blender 2.8+
+#   - Rokoko Studio Live (v1.4.3):    Blender 2.8+
+#
+# Versions below 4.0 may have compatibility issues with some addons.
