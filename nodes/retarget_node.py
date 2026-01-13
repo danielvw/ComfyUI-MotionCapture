@@ -174,6 +174,28 @@ class SMPLToFBX:
             # Re-raise with context
             raise RuntimeError(f"Blender not found: {e}") from e
 
+    def _find_blender_addons_dir(self, blender_exe: Path) -> str:
+        """Find Blender addons directory dynamically based on Blender version."""
+        blender_root = blender_exe.parent
+
+        # Look for existing scripts/addons directory
+        # This handles both versioned (5.0/scripts/addons) and direct (scripts/addons) layouts
+        addons_candidates = list(blender_root.glob("**/scripts/addons"))
+        if addons_candidates:
+            # Return the first (and usually only) match
+            return str(addons_candidates[0])
+
+        # Fallback: try version-specific directories
+        # Check for version folders like "4.2", "5.0", etc.
+        for item in blender_root.iterdir():
+            if item.is_dir() and item.name[0].isdigit():
+                addons_dir = item / "scripts" / "addons"
+                if addons_dir.exists():
+                    return str(addons_dir)
+
+        # Final fallback to empty string (will be handled by Blender script)
+        return ""
+
     def _save_smpl_params(self, smpl_params: Dict, output_path: Path):
         """Save SMPL parameters to npz file for Blender."""
         # Extract global parameters
@@ -204,10 +226,10 @@ class SMPLToFBX:
         This approach produces good rotations/poses without mesh twisting.
         """
 
-        # Get the addons directory path
+        # Get the addons directory path dynamically
         blender_exe = self._find_blender()
         if blender_exe:
-            addons_dir = str(blender_exe.parent / "4.2" / "scripts" / "addons")
+            addons_dir = self._find_blender_addons_dir(blender_exe)
         else:
             addons_dir = ""
 
