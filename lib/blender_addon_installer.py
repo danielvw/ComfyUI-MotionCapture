@@ -24,6 +24,11 @@ def get_local_blender_path():
     """Find Blender installation using centralized config."""
     # Import BlenderConfig
     try:
+        # Ensure lib directory is in sys.path
+        lib_dir = Path(__file__).parent
+        if str(lib_dir) not in sys.path:
+            sys.path.insert(0, str(lib_dir))
+
         from blender_config import BlenderConfig
         config = BlenderConfig()
         blender_exe = config.find_blender_executable()
@@ -31,8 +36,8 @@ def get_local_blender_path():
         if blender_exe:
             log_info(f"Found Blender via BlenderConfig: {blender_exe}")
             return blender_exe
-    except ImportError:
-        log_error("Could not import blender_config module")
+    except ImportError as e:
+        log_error(f"Could not import blender_config module: {e}")
     except Exception as e:
         log_error(f"BlenderConfig failed: {e}")
 
