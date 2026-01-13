@@ -2,6 +2,7 @@
 BVHtoFBX Node - Retarget BVH motion to rigged FBX/VRM characters using Blender
 """
 
+import sys
 from pathlib import Path
 from typing import Dict, Tuple
 import subprocess

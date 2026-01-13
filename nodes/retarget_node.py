@@ -2,6 +2,7 @@
 SMPLToFBX Node - Retargets SMPL motion to rigged FBX characters
 """
 
+import sys
 from pathlib import Path
 from typing import Dict, Tuple
 import torch

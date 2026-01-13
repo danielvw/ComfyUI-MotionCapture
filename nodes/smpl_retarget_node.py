@@ -5,6 +5,7 @@ This node takes SMPL motion data and applies it to a rigged FBX with SMPL skelet
 (typically from UniRig with SMPL template), producing an animated FBX.
 """
 
+import sys
 import os
 import subprocess
 import tempfile
