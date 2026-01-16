@@ -249,7 +249,7 @@ class MHRtoBVH:
 
                 if parent_idx == -1:
                     # Root joint - compute global rotation from hip/shoulder orientation
-                    rot_mat = self._compute_root_rotation(kp)
+                    rot_mat = self._compute_root_rotation(kp_flipped)
                     accumulated_rotations[joint_idx] = rot_mat
                 else:
                     # Get parent's accumulated rotation
